@@ -12,7 +12,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     // The init script changes the <html> class before React hydrates, so the server HTML and the
     // client DOM legitimately differ on this one element.
     <html lang="en" suppressHydrationWarning>
-      <body>
+      {/* Browser extensions (e.g. Grammarly) add attributes to <body> before hydration. This only
+          ignores attribute differences on <body> itself, not on its children. */}
+      <body suppressHydrationWarning>
         {/* Inline script that reads the stored theme and sets the class before the first paint. */}
         <InitColorSchemeScript attribute="class" />
         <Providers>{children}</Providers>
