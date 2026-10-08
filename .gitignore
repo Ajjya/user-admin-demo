@@ -41,3 +41,12 @@ yarn-error.log*
 next-env.d.ts
 .claude/
 
+# local assistant notes
+CLAUDE.md
+
+# test output
+/coverage
+/test-results
+/playwright-report
+/blob-report
+/playwright/.cache
