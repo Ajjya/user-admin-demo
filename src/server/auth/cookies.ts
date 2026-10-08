@@ -1,4 +1,5 @@
 import "server-only";
+import { cookies } from "next/headers";
 import type { NextResponse } from "next/server";
 import type { Session } from "@/domain/session";
 
@@ -34,4 +35,13 @@ export function setSessionCookie(response: NextResponse, session: Session): void
 
 export function clearSessionCookie(response: NextResponse): void {
   response.cookies.delete(SESSION_COOKIE);
+}
+
+/** For Server Actions, which have no response object: Next.js applies cookies() to the response. */
+export async function setSessionCookieInAction(session: Session): Promise<void> {
+  (await cookies()).set(SESSION_COOKIE, session.id, sessionCookieOptions(session));
+}
+
+export async function clearSessionCookieInAction(): Promise<void> {
+  (await cookies()).delete(SESSION_COOKIE);
 }
