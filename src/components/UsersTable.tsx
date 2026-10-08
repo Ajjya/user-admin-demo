@@ -1,6 +1,11 @@
 "use client";
 
+import AddIcon from "@mui/icons-material/Add";
+import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
+import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
+import IconButton from "@mui/material/IconButton";
 import Pagination from "@mui/material/Pagination";
 import PaginationItem from "@mui/material/PaginationItem";
 import Paper from "@mui/material/Paper";
@@ -15,7 +20,9 @@ import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import NextLink from "next/link";
 import { useRouter } from "next/navigation";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
+import { UserDialog } from "@/components/UserDialog";
 import type { PublicUser } from "@/domain/user";
 import { PAGE_SIZES } from "@/shared/schemas";
 
@@ -36,6 +43,12 @@ const dateFormat = new Intl.DateTimeFormat("en-GB", {
   timeZone: "UTC",
 });
 
+type OpenDialog =
+  | { kind: "create" }
+  | { kind: "edit"; user: PublicUser }
+  | { kind: "delete"; user: PublicUser }
+  | null;
+
 function pageHref(page: number, pageSize: number): string {
   return `/dashboard?page=${page}&pageSize=${pageSize}`;
 }
@@ -53,6 +66,8 @@ export function UsersTable({
   currentUserId,
 }: UsersTableProps): ReactNode {
   const router = useRouter();
+  const [dialog, setDialog] = useState<OpenDialog>(null);
+  const closeDialog = (): void => setDialog(null);
 
   return (
     <Stack spacing={2}>
@@ -60,9 +75,18 @@ export function UsersTable({
         <Typography variant="h5" component="h2">
           Users
         </Typography>
-        <Typography color="text.secondary" data-testid="users-total">
-          {total} {total === 1 ? "user" : "users"}
-        </Typography>
+        <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
+          <Typography color="text.secondary" data-testid="users-total">
+            {total} {total === 1 ? "user" : "users"}
+          </Typography>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => setDialog({ kind: "create" })}
+          >
+            Create user
+          </Button>
+        </Stack>
       </Stack>
 
       <TableContainer component={Paper} variant="outlined">
@@ -75,6 +99,7 @@ export function UsersTable({
               <TableCell align="right">Logins</TableCell>
               <TableCell>Created (UTC)</TableCell>
               <TableCell>Updated (UTC)</TableCell>
+              <TableCell align="right">Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -97,6 +122,27 @@ export function UsersTable({
                 <TableCell align="right">{user.loginsCounter}</TableCell>
                 <TableCell>{dateFormat.format(user.createdAt)}</TableCell>
                 <TableCell>{dateFormat.format(user.updatedAt)}</TableCell>
+                <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
+                  <IconButton
+                    size="small"
+                    aria-label="Edit"
+                    title="Edit"
+                    onClick={() => setDialog({ kind: "edit", user })}
+                  >
+                    <EditOutlinedIcon fontSize="small" />
+                  </IconButton>
+                  {/* You cannot delete yourself (the server rejects it too). */}
+                  {user.id !== currentUserId && (
+                    <IconButton
+                      size="small"
+                      aria-label="Delete"
+                      title="Delete"
+                      onClick={() => setDialog({ kind: "delete", user })}
+                    >
+                      <DeleteOutlinedIcon fontSize="small" />
+                    </IconButton>
+                  )}
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -136,6 +182,16 @@ export function UsersTable({
           )}
         />
       </Stack>
+
+      {dialog?.kind === "create" && <UserDialog onClose={closeDialog} />}
+      {dialog?.kind === "edit" && (
+        <UserDialog
+          user={dialog.user}
+          isSelf={dialog.user.id === currentUserId}
+          onClose={closeDialog}
+        />
+      )}
+      {dialog?.kind === "delete" && <ConfirmDeleteDialog user={dialog.user} onClose={closeDialog} />}
     </Stack>
   );
 }

@@ -4,6 +4,8 @@
  * are never sent back.
  */
 export interface FormState {
+  /** Set when the action succeeded, e.g. so a dialog can close. */
+  ok?: boolean;
   formError?: string;
   fieldErrors?: Record<string, string>;
   values?: Record<string, string>;

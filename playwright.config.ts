@@ -22,12 +22,13 @@ export default defineConfig({
     },
     {
       // Pagination asserts the global newest-first order, so it must not run while other tests
-      // create users: it starts after the main project and runs its tests one by one.
+      // create users: it starts after the main project and uses a single worker.
       name: "chromium-pagination",
       use: { ...devices["Desktop Chrome"] },
       testMatch: /dashboard-pagination\.spec\.ts/,
       dependencies: ["chromium"],
       fullyParallel: false,
+      workers: 1,
     },
   ],
   webServer: {

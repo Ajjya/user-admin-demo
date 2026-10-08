@@ -1,9 +1,8 @@
 import type { Page } from "@playwright/test";
 import { expect, signInViaUi, test, type ApiHelper } from "./fixtures";
 
-// Runs in its own Playwright project after all other tests (see playwright.config.ts), one test at a
-// time, so nothing else inserts users while the global order is being asserted.
-test.describe.configure({ mode: "serial" });
+// Runs in its own Playwright project after all other tests with a single worker (see
+// playwright.config.ts), so nothing else inserts users while the global order is being asserted.
 
 const rows = (page: Page) => page.locator("tbody tr");
 
@@ -29,7 +28,7 @@ test.describe("dashboard pagination", () => {
       await expect(rows(page).nth(index)).toContainText(email);
     }
 
-    await page.getByRole("link", { name: "Go to page 2" }).click();
+    await page.getByRole("link", { name: "Go to page 2", exact: true }).click();
 
     await expect(page).toHaveURL(/\/dashboard\?page=2&pageSize=6$/);
     await expect(rows(page).first()).toContainText(newestFirst[6]);
@@ -66,7 +65,7 @@ test.describe("dashboard pagination", () => {
     await expect(current).toHaveCount(1);
     const lastPage = Number(await current.textContent());
     expect(lastPage).toBeGreaterThan(1);
-    await expect(page.getByRole("link", { name: `Go to page ${lastPage + 1}` })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: `Go to page ${lastPage + 1}`, exact: true })).toHaveCount(0);
     await expect(rows(page)).not.toHaveCount(0);
   });
 
