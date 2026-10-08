@@ -24,6 +24,7 @@ export default defineConfig({
           environment: "node",
           // Starts one in-memory mongod; the first run also downloads the binary.
           globalSetup: ["tests/integration/global-setup.ts"],
+          env: { LOG_LEVEL: "silent" },
           hookTimeout: 60_000,
           testTimeout: 15_000,
         },

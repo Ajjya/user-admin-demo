@@ -8,8 +8,11 @@ const globalForMongo = globalThis as typeof globalThis & { mongoClient?: MongoCl
 
 export function getMongoClient(): MongoClient {
   if (!globalForMongo.mongoClient) {
-    // The driver connects lazily on the first operation.
-    globalForMongo.mongoClient = new MongoClient(getConfig().MONGODB_URI);
+    // The driver connects lazily on the first operation. Fail after 5 s instead of the default
+    // 30 s when the database is unreachable, so health checks answer 503 quickly.
+    globalForMongo.mongoClient = new MongoClient(getConfig().MONGODB_URI, {
+      serverSelectionTimeoutMS: 5000,
+    });
   }
   return globalForMongo.mongoClient;
 }
