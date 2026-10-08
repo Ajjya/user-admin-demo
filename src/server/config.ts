@@ -4,6 +4,7 @@ import { z } from "zod";
 const envSchema = z.object({
   MONGODB_URI: z.string().min(1, "MONGODB_URI is required"),
   MONGODB_DB: z.string().min(1).default("user_admin"),
+  SESSION_TTL_HOURS: z.coerce.number().positive().default(24),
 });
 
 export type Config = z.infer<typeof envSchema>;

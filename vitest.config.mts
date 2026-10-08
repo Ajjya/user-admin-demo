@@ -32,6 +32,8 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       include: ["src/domain/**", "src/server/services/**"],
+      // Pure wiring of real implementations; exercised by the API and e2e tests instead.
+      exclude: ["src/server/services/container.ts"],
     },
   },
 });
