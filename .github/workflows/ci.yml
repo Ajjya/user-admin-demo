@@ -62,6 +62,9 @@ jobs:
       - name: Lint
         run: yarn lint
 
+      - name: Lint OpenAPI description
+        run: yarn lint:openapi
+
       - name: Typecheck
         run: yarn typecheck
 

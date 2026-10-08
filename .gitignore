@@ -52,3 +52,4 @@ CLAUDE.md
 /blob-report
 /playwright/.cache
 /.mongodb-binaries
+/api-docs.html

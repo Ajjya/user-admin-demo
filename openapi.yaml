@@ -1,0 +1,555 @@
+openapi: 3.1.0
+info:
+  title: User Admin API
+  version: 1.0.0
+  summary: Back-office user management.
+  description: |
+    REST API of the User Admin application: sign-up, sign-in (sessions) and user management.
+
+    **Authentication.** Sign-up and sign-in return a `sessionId`. Send it as
+    `Authorization: Bearer <sessionId>` (non-browser clients) or rely on the httpOnly `sid` cookie
+    that the same responses set (browsers). Every signed-in user is an administrator.
+
+    **Temporary passwords.** A user created by an administrator (or whose password an administrator
+    reset) has `mustChangePassword: true`. Until they call `POST /api/auth/change-password`, every
+    other authenticated endpoint except log out answers `403 PASSWORD_CHANGE_REQUIRED`.
+
+    **Errors** always use the `Error` schema. Request bodies are strict: unknown fields are rejected
+    with `400 VALIDATION_ERROR`.
+  license:
+    name: MIT
+    identifier: MIT
+servers:
+  - url: /
+    description: The host serving the app (http://localhost:3000 with Docker Compose or `yarn dev`).
+tags:
+  - name: Health
+    description: Liveness and database check, used by the Docker healthcheck.
+  - name: Auth
+    description: Sign-up, sign-in, log out and the forced password change.
+  - name: Users
+    description: User management (any signed-in user is an administrator).
+security:
+  - bearerAuth: []
+  - cookieAuth: []
+
+paths:
+  /api/health:
+    get:
+      tags: [Health]
+      operationId: getHealth
+      summary: Health check including a database ping
+      security: []
+      responses:
+        "200":
+          description: The app and the database are reachable.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status:
+                    const: ok
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/auth/sign-up:
+    post:
+      tags: [Auth]
+      operationId: signUp
+      summary: Register an active user and start a session
+      description: Creates an active user with `loginsCounter` 1 and returns a new session.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignUpRequest"
+      responses:
+        "201":
+          $ref: "#/components/responses/SessionCreated"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "409":
+          $ref: "#/components/responses/EmailTaken"
+
+  /api/sessions:
+    post:
+      tags: [Auth]
+      operationId: signIn
+      summary: Sign in (create a session)
+      description: |
+        Unknown email, deleted user and wrong password all return the same `401`.
+        `403 USER_INACTIVE` is returned only when the password is correct.
+        Every successful sign-in increments the user's `loginsCounter`.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignInRequest"
+      responses:
+        "201":
+          $ref: "#/components/responses/SessionCreated"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          description: "`INVALID_CREDENTIALS`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "`USER_INACTIVE`: inactive users cannot create sessions."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/sessions/{id}:
+    parameters:
+      - $ref: "#/components/parameters/SessionId"
+    delete:
+      tags: [Auth]
+      operationId: signOut
+      summary: Log out (terminate one of your own sessions)
+      description: Allowed while a temporary password is pending. Clears the `sid` cookie when it
+        refers to the terminated session.
+      responses:
+        "204":
+          description: Terminated (terminating twice is not an error).
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "404":
+          description: "`SESSION_NOT_FOUND`: unknown, or belongs to another user."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/auth/change-password:
+    post:
+      tags: [Auth]
+      operationId: changePassword
+      summary: Replace an administrator-set temporary password
+      description: Only available while `mustChangePassword` is true. The current session stays valid.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangePasswordRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/UserResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "409":
+          description: "`PASSWORD_CHANGE_NOT_REQUIRED`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422":
+          description: "`PASSWORD_UNCHANGED`: the new password equals the temporary one."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/users:
+    get:
+      tags: [Users]
+      operationId: listUsers
+      summary: List users, newest first (server-side pagination)
+      description: Deleted users are excluded. A page past the end returns the last page.
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            enum: [6, 12, 24]
+            default: 6
+      responses:
+        "200":
+          description: One page of users.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserPage"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/PasswordChangeRequired"
+    post:
+      tags: [Users]
+      operationId: createUser
+      summary: Create a user with a temporary password
+      description: The new user has `mustChangePassword` true and must choose a password after signing in.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserRequest"
+      responses:
+        "201":
+          $ref: "#/components/responses/UserResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/PasswordChangeRequired"
+        "409":
+          $ref: "#/components/responses/EmailTaken"
+
+  /api/users/{id}:
+    parameters:
+      - $ref: "#/components/parameters/UserId"
+    patch:
+      tags: [Users]
+      operationId: updateUser
+      summary: Update a user
+      description: |
+        - `createdAt` and `email` cannot be changed (strict body → `400`); `updatedAt` is always set.
+        - First and last name cannot change while the **stored** status is inactive, even together
+          with `status: active` (`422 USER_INACTIVE_RENAME`). Sending unchanged names is allowed.
+        - You cannot deactivate yourself (`422 CANNOT_MODIFY_SELF`).
+        - Deactivation terminates the user's sessions. A password set for another user is temporary
+          and terminates their sessions; a password you set for yourself is not.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/UserResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/PasswordChangeRequired"
+        "404":
+          $ref: "#/components/responses/UserNotFound"
+        "422":
+          description: "`USER_INACTIVE_RENAME` or `CANNOT_MODIFY_SELF`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      tags: [Users]
+      operationId: deleteUser
+      summary: Delete a user (soft delete)
+      description: The user disappears from lists, is signed out and cannot sign in; the email stays
+        reserved. You cannot delete yourself.
+      responses:
+        "204":
+          description: Deleted.
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/PasswordChangeRequired"
+        "404":
+          $ref: "#/components/responses/UserNotFound"
+        "422":
+          description: "`CANNOT_MODIFY_SELF`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: The `sessionId` returned by sign-up or sign-in.
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: sid
+      description: httpOnly session cookie set by sign-up and sign-in (browsers).
+
+  parameters:
+    UserId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    SessionId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  schemas:
+    Name:
+      type: string
+      minLength: 1
+      maxLength: 50
+      description: Trimmed.
+    Email:
+      type: string
+      format: email
+      description: Trimmed and lowercased; unique, case-insensitively.
+    Password:
+      type: string
+      minLength: 8
+      maxLength: 128
+      writeOnly: true
+    UserStatus:
+      type: string
+      enum: [active, inactive]
+
+    User:
+      type: object
+      required: [id, firstName, lastName, email, status, loginsCounter, mustChangePassword, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+          format: email
+        status:
+          $ref: "#/components/schemas/UserStatus"
+        loginsCounter:
+          type: integer
+          minimum: 0
+          description: Incremented on every session creation, including the one created by sign-up.
+        mustChangePassword:
+          type: boolean
+          description: True while an administrator-set temporary password is pending.
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    UserPage:
+      type: object
+      required: [items, page, pageSize, total, totalPages]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/User"
+        page:
+          type: integer
+          minimum: 1
+          description: The page actually returned (clamped to the last page).
+        pageSize:
+          type: integer
+          enum: [6, 12, 24]
+        total:
+          type: integer
+          minimum: 0
+        totalPages:
+          type: integer
+          minimum: 1
+
+    SessionCreated:
+      type: object
+      required: [sessionId, expiresAt, user]
+      properties:
+        sessionId:
+          type: string
+          format: uuid
+          description: "Use as `Authorization: Bearer <sessionId>`."
+        expiresAt:
+          type: string
+          format: date-time
+          description: Absolute expiry (24 hours by default), not extended by activity.
+        user:
+          $ref: "#/components/schemas/User"
+
+    SignUpRequest:
+      type: object
+      additionalProperties: false
+      required: [firstName, lastName, email, password]
+      properties:
+        firstName:
+          $ref: "#/components/schemas/Name"
+        lastName:
+          $ref: "#/components/schemas/Name"
+        email:
+          $ref: "#/components/schemas/Email"
+        password:
+          $ref: "#/components/schemas/Password"
+
+    SignInRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties:
+        email:
+          $ref: "#/components/schemas/Email"
+        password:
+          type: string
+          minLength: 1
+          maxLength: 128
+          writeOnly: true
+
+    ChangePasswordRequest:
+      type: object
+      additionalProperties: false
+      required: [newPassword]
+      properties:
+        newPassword:
+          $ref: "#/components/schemas/Password"
+
+    CreateUserRequest:
+      type: object
+      additionalProperties: false
+      required: [firstName, lastName, email, password]
+      properties:
+        firstName:
+          $ref: "#/components/schemas/Name"
+        lastName:
+          $ref: "#/components/schemas/Name"
+        email:
+          $ref: "#/components/schemas/Email"
+        password:
+          $ref: "#/components/schemas/Password"
+        status:
+          $ref: "#/components/schemas/UserStatus"
+          default: active
+
+    UpdateUserRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        firstName:
+          $ref: "#/components/schemas/Name"
+        lastName:
+          $ref: "#/components/schemas/Name"
+        status:
+          $ref: "#/components/schemas/UserStatus"
+        password:
+          $ref: "#/components/schemas/Password"
+
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              enum:
+                - VALIDATION_ERROR
+                - UNAUTHENTICATED
+                - INVALID_CREDENTIALS
+                - USER_INACTIVE
+                - PASSWORD_CHANGE_REQUIRED
+                - USER_NOT_FOUND
+                - SESSION_NOT_FOUND
+                - EMAIL_TAKEN
+                - PASSWORD_CHANGE_NOT_REQUIRED
+                - USER_INACTIVE_RENAME
+                - CANNOT_MODIFY_SELF
+                - PASSWORD_UNCHANGED
+                - INTERNAL_ERROR
+                - SERVICE_UNAVAILABLE
+            message:
+              type: string
+            details:
+              type: array
+              description: Field-level problems, only for `VALIDATION_ERROR`.
+              items:
+                type: object
+                required: [path, message]
+                properties:
+                  path:
+                    type: string
+                  message:
+                    type: string
+
+  responses:
+    SessionCreated:
+      description: Session created. The `sid` cookie is set as well.
+      headers:
+        Set-Cookie:
+          description: "`sid=<sessionId>; HttpOnly; SameSite=Lax; Path=/; Expires=…` (`Secure` in production)."
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/SessionCreated"
+    UserResponse:
+      description: The user.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [user]
+            properties:
+              user:
+                $ref: "#/components/schemas/User"
+    ValidationError:
+      description: "`VALIDATION_ERROR`: invalid body or query, unknown fields, or malformed JSON."
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Unauthenticated:
+      description: "`UNAUTHENTICATED`: missing, unknown, expired or terminated session."
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    PasswordChangeRequired:
+      description: "`PASSWORD_CHANGE_REQUIRED`: the caller must replace a temporary password first."
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    UserNotFound:
+      description: "`USER_NOT_FOUND`: unknown or deleted user."
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    EmailTaken:
+      description: "`EMAIL_TAKEN`: the email belongs to an existing (or deleted) user."
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    ServiceUnavailable:
+      description: "`SERVICE_UNAVAILABLE`: the database is unreachable."
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"

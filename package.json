@@ -16,7 +16,8 @@
     "test:unit": "vitest run --project unit",
     "test:integration": "vitest run --project integration",
     "test:coverage": "vitest run --coverage",
-    "test:e2e": "next build && playwright test"
+    "test:e2e": "next build && playwright test",
+    "lint:openapi": "redocly lint openapi.yaml"
   },
   "dependencies": {
     "@emotion/cache": "^11.14.0",
@@ -36,6 +37,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.64.0",
+    "@redocly/cli": "^2.60.0",
     "@types/node": "^26",
     "@types/react": "^19",
     "@types/react-dom": "^19",

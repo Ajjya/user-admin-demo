@@ -167,6 +167,7 @@ yarn dev
 | `yarn dev` | Development server with hot reload |
 | `yarn build` / `yarn start` | Production build / server |
 | `yarn lint` | ESLint |
+| `yarn lint:openapi` | Validate `openapi.yaml` (Redocly) |
 | `yarn typecheck` | `next typegen` (route types) + `tsc --noEmit` |
 
 ## Running tests
@@ -205,7 +206,7 @@ Node.js 26:
 
 | Job | Steps |
 |---|---|
-| Lint, typecheck, tests, e2e | frozen install → `yarn lint` → `yarn typecheck` → `yarn test:coverage` (fails below the coverage threshold) → `yarn test:e2e`; the Playwright report is uploaded when it fails |
+| Lint, typecheck, tests, e2e | frozen install → `yarn lint` → `yarn lint:openapi` → `yarn typecheck` → `yarn test:coverage` (fails below the coverage threshold) → `yarn test:e2e`; the Playwright report is uploaded when it fails |
 | Docker smoke test | `docker compose up --build --wait` with `.env.example`, then health check, sign-up and an authenticated API call; container logs are printed when it fails |
 
 The Yarn cache, the `mongod` binary used by the in-memory MongoDB and the Playwright browser are
@@ -335,6 +336,13 @@ docker-compose.yml        mongo + app
 ```
 
 ## API reference
+
+The full machine-readable description is [`openapi.yaml`](openapi.yaml) (OpenAPI 3.1; validated in
+CI with `yarn lint:openapi`). Import it into Postman or Insomnia, or render it as HTML:
+
+```bash
+yarn redocly build-docs openapi.yaml -o api-docs.html
+```
 
 JSON in and out. Authenticated endpoints accept the session id as `Authorization: Bearer <sessionId>`
 (non-browser clients) or the `sid` cookie (browser).
@@ -498,7 +506,8 @@ docker push registry.example.com/user-admin-mongo:1.0.0
 
 ## Future improvements
 
-- An OpenAPI description of the REST API.
+- Generate the OpenAPI description from the zod schemas (it is hand-written today) and validate
+  responses against it in the integration tests.
 - Rate limiting and temporary lockout on sign-in.
 - Roles and permissions instead of "every user is an admin".
 - Self-service password change, password reset by email, email verification and email change.
