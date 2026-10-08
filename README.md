@@ -1,5 +1,7 @@
 # User Admin
 
+[![CI](https://github.com/Ajjya/user-admin-demo/actions/workflows/ci.yml/badge.svg)](https://github.com/Ajjya/user-admin-demo/actions/workflows/ci.yml)
+
 A small back-office application where an administrator signs up, signs in and manages platform
 users. One Next.js application serves both the UI and a REST API, backed by MongoDB, and the whole
 stack starts with one Docker command.
@@ -8,6 +10,7 @@ stack starts with one Docker command.
 - [Quick start (Docker)](#quick-start-docker)
 - [Local development](#local-development)
 - [Running tests](#running-tests)
+- [Continuous integration](#continuous-integration)
 - [Features](#features)
 - [Architecture](#architecture)
 - [Project structure](#project-structure)
@@ -176,6 +179,19 @@ yarn dev
 | Pagination (6 per page, page size, URL state) | `e2e/dashboard-pagination.spec.ts` |
 | Create/update/delete, rename blocked for inactive users, revoked sessions | `e2e/users-crud.spec.ts` |
 | Theme choice persists after reload and in a new page | `e2e/theme.spec.ts` |
+
+## Continuous integration
+
+GitHub Actions (`.github/workflows/ci.yml`) runs on every push to `main` and on pull requests, on
+Node.js 26:
+
+| Job | Steps |
+|---|---|
+| Lint, typecheck, tests, e2e | frozen install → `yarn lint` → `yarn typecheck` → `yarn test:coverage` (fails below the coverage threshold) → `yarn test:e2e`; the Playwright report is uploaded when it fails |
+| Docker smoke test | `docker compose up --build --wait` with `.env.example`, then health check, sign-up and an authenticated API call; container logs are printed when it fails |
+
+The Yarn cache, the `mongod` binary used by the in-memory MongoDB and the Playwright browser are
+cached between runs. A newer push to the same branch cancels the run still in progress.
 
 ## Features
 
@@ -463,7 +479,6 @@ docker push registry.example.com/user-admin-mongo:1.0.0
 
 ## Future improvements
 
-- GitHub Actions CI: lint, typecheck, coverage, build, e2e and a Docker smoke test.
 - Optional demo data on startup (an admin plus about 20 users) behind a flag.
 - An OpenAPI description of the REST API.
 - Rate limiting and temporary lockout on sign-in.

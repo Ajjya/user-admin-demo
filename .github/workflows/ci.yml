@@ -1,0 +1,114 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A newer push to the same branch cancels the run that is still going.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Lint, typecheck, tests, e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # Where mongodb-memory-server keeps its mongod binary (downloaded by its postinstall step).
+      MONGOMS_DOWNLOAD_DIR: ${{ github.workspace }}/.mongodb-binaries
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: yarn
+
+      # Node 25+ no longer bundles Corepack; it provides the Yarn version pinned in package.json.
+      - name: Enable Corepack
+        run: npm install --global corepack@latest && corepack enable
+
+      # The in-memory MongoDB binary and the Playwright browser are large; cache them between runs.
+      # Restored before the install, because the install itself downloads the mongod binary.
+      - name: Cache MongoDB binary
+        uses: actions/cache@v4
+        with:
+          path: .mongodb-binaries
+          key: mongodb-binaries-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
+
+      - name: Install Playwright browser
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: yarn playwright install --with-deps chromium
+
+      - name: Install Playwright system dependencies
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: yarn playwright install-deps chromium
+
+      - name: Lint
+        run: yarn lint
+
+      - name: Typecheck
+        run: yarn typecheck
+
+      - name: Unit and integration tests (with coverage threshold)
+        run: yarn test:coverage
+
+      - name: End-to-end tests
+        run: yarn test:e2e
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report
+            test-results
+          retention-days: 7
+
+  docker:
+    name: Docker smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use example environment
+        run: cp .env.example .env
+
+      - name: Build and start the stack
+        run: docker compose up --build --detach --wait --wait-timeout 180
+
+      - name: Smoke test
+        run: |
+          set -euo pipefail
+          base=http://localhost:3000
+          curl --fail --silent "$base/api/health"
+          session_id=$(curl --fail --silent -X POST "$base/api/auth/sign-up" \
+            -H 'content-type: application/json' \
+            -d '{"firstName":"CI","lastName":"Check","email":"ci@example.com","password":"ci-password"}' \
+            | jq -r .sessionId)
+          curl --fail --silent "$base/api/users" -H "authorization: Bearer $session_id" | jq -e '.total == 1'
+
+      - name: Show logs on failure
+        if: failure()
+        run: docker compose logs
+
+      - name: Stop the stack
+        if: always()
+        run: docker compose down --volumes
