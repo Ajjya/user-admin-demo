@@ -30,6 +30,8 @@ services:
       MONGODB_DB: ${MONGO_APP_DB:-user_admin}
       SESSION_TTL_HOURS: ${SESSION_TTL_HOURS:-24}
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      SEED_DEMO_DATA: ${SEED_DEMO_DATA:-false}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
     ports:
       - "${APP_PORT:-3000}:3000"
 

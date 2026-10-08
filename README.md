@@ -64,6 +64,22 @@ on the dashboard. Both containers report `healthy` in `docker compose ps` once t
 | `docker compose down` | Stop; the data stays in the `mongo-data` volume |
 | `docker compose down -v` | Stop and **delete the data**; MongoDB is initialized again on the next start |
 
+### Demo data (optional)
+
+To start with a populated dashboard, set this in `.env` **before the first start** (or after
+`docker compose down -v`):
+
+```
+SEED_DEMO_DATA=true
+SEED_ADMIN_PASSWORD=<at least 8 characters>
+```
+
+On startup the app then creates `admin@example.com` (sign in with `SEED_ADMIN_PASSWORD`) and 20
+users, two of them inactive, so pagination shows four pages. The 20 users get the same password as
+a temporary one: signing in as any of them shows the forced password change. The seed runs only
+when the database has no users, so it never mixes into real data and does nothing on restarts. With
+`SEED_DEMO_DATA=true` and no valid password the app refuses to start.
+
 ### What happens on `docker compose up`
 
 1. Compose reads `.env` and builds two images: our MongoDB image (`docker/mongo`) and the app
@@ -73,8 +89,8 @@ on the dashboard. Both containers report `healthy` in `docker compose ps` once t
    the application database only) and `02-indexes.js` creates the indexes.
 3. MongoDB becomes `healthy` only when the real server accepts the application user over the
    network. The app container waits for that (`depends_on: service_healthy`).
-4. The app starts, ensures the indexes again (idempotent), and answers on port 3000. MongoDB's
-   port is **not** published to the host.
+4. The app starts, ensures the indexes again (idempotent), optionally creates the demo data, and
+   answers on port 3000. MongoDB's port is **not** published to the host.
 
 ### MongoDB credentials
 
@@ -120,6 +136,8 @@ Point the app at a database in `.env` or `.env.local` (both git-ignored; Next.js
 | `MONGODB_DB` | `user_admin` | Database name |
 | `SESSION_TTL_HOURS` | `24` | Absolute session lifetime |
 | `LOG_LEVEL` | `info` | pino log level (`silent` in tests) |
+| `SEED_DEMO_DATA` | `false` | Create demo data on startup if the database has no users |
+| `SEED_ADMIN_PASSWORD` | – | Password of the demo admin; required when `SEED_DEMO_DATA=true` |
 
 Either use any local MongoDB, for example one installed with Homebrew:
 
@@ -303,9 +321,10 @@ src/
     repositories/         repository interfaces + MongoDB implementations
     security/             Argon2id password hashing
     services/             AuthService, SessionService, UserService, composition root
+    seed.ts               optional demo data
   shared/                 zod schemas and form state shared by server and client
   theme/                  MUI theme (light/dark color schemes)
-  instrumentation.ts      startup hook: ensure indexes
+  instrumentation.ts      startup hook: ensure indexes, optional demo data
   proxy.ts                optimistic redirects (Next.js 16 name for middleware)
 tests/unit/               Vitest, in-memory fakes, no database
 tests/integration/        Vitest against mongodb-memory-server
@@ -479,7 +498,6 @@ docker push registry.example.com/user-admin-mongo:1.0.0
 
 ## Future improvements
 
-- Optional demo data on startup (an admin plus about 20 users) behind a flag.
 - An OpenAPI description of the REST API.
 - Rate limiting and temporary lockout on sign-in.
 - Roles and permissions instead of "every user is an admin".
