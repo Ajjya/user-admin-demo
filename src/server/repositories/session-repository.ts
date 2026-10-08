@@ -5,6 +5,8 @@ export interface SessionRepository {
   findById(id: string): Promise<Session | null>;
   /** Persists terminatedAt, the only mutable field of a session. */
   save(session: Session): Promise<void>;
+  /** Not terminated and not expired at `now`, newest first. */
+  listActiveForUser(userId: string, now: Date): Promise<Session[]>;
   /** Terminates every not-yet-terminated session of the user. Returns how many were terminated. */
   terminateAllForUser(userId: string, now: Date): Promise<number>;
 }

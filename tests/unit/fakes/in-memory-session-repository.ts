@@ -19,6 +19,17 @@ export class InMemorySessionRepository implements SessionRepository {
     }
   }
 
+  async listActiveForUser(userId: string, now: Date): Promise<Session[]> {
+    return [...this.sessions.values()]
+      .filter(
+        (session) =>
+          session.userId === userId &&
+          session.terminatedAt === null &&
+          session.expiresAt.getTime() > now.getTime(),
+      )
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
+
   async terminateAllForUser(userId: string, now: Date): Promise<number> {
     let count = 0;
     for (const session of this.sessions.values()) {

@@ -61,7 +61,8 @@ test.describe("dashboard pagination", () => {
 
     await page.goto("/dashboard?page=999&pageSize=6");
 
-    const current = page.locator('[aria-current="page"]');
+    // Scoped to the pagination control: the header navigation also marks its current page.
+    const current = page.getByRole("navigation", { name: "pagination navigation" }).locator('[aria-current="page"]');
     await expect(current).toHaveCount(1);
     const lastPage = Number(await current.textContent());
     expect(lastPage).toBeGreaterThan(1);

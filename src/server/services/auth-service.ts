@@ -13,6 +13,11 @@ import type { PasswordHasher } from "@/server/security/password";
 import type { AuthenticatedSession, SessionService } from "@/server/services/session-service";
 import type { SignInInput, SignUpInput } from "@/shared/schemas";
 
+/** Where the sign-in comes from; stored on the session for display only. */
+export interface SignInContext {
+  userAgent?: string | null;
+}
+
 export interface AuthServiceDeps {
   users: UserRepository;
   sessionService: SessionService;
@@ -31,7 +36,7 @@ export class AuthService {
 
   constructor(private readonly deps: AuthServiceDeps) {}
 
-  async signUp(input: SignUpInput): Promise<AuthenticatedSession> {
+  async signUp(input: SignUpInput, context: SignInContext = {}): Promise<AuthenticatedSession> {
     const user = createUser(
       {
         id: this.deps.generateId(),
@@ -45,10 +50,10 @@ export class AuthService {
       this.deps.clock(),
     );
     await this.deps.users.insert(user);
-    return this.deps.sessionService.startSession(user.id);
+    return this.deps.sessionService.startSession(user.id, context.userAgent);
   }
 
-  async signIn(input: SignInInput): Promise<AuthenticatedSession> {
+  async signIn(input: SignInInput, context: SignInContext = {}): Promise<AuthenticatedSession> {
     const user = await this.deps.users.findByEmail(normalizeEmail(input.email));
     if (!user || user.deletedAt !== null) {
       // Spend the same hashing time as a real check, so response time does not reveal emails.
@@ -60,7 +65,7 @@ export class AuthService {
     }
     // Only after the password is proven correct may we reveal that the account is inactive.
     assertCanStartSession(user);
-    return this.deps.sessionService.startSession(user.id);
+    return this.deps.sessionService.startSession(user.id, context.userAgent);
   }
 
   /** The forced change after an admin-set temporary password; the current session stays valid. */

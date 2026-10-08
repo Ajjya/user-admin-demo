@@ -16,5 +16,8 @@ export async function ensureIndexes(db: Db): Promise<void> {
   ]);
   await sessionsCollection(db).createIndexes([
     { key: { userId: 1, terminatedAt: 1 }, name: "user_active_sessions" },
+    // TTL index: MongoDB's background monitor (about once a minute) deletes a session once its
+    // expiresAt has passed. The app already treats it as expired at expiresAt; this only cleans up.
+    { key: { expiresAt: 1 }, name: "expired_sessions_ttl", expireAfterSeconds: 0 },
   ]);
 }

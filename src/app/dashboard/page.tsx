@@ -1,11 +1,6 @@
-import AppBar from "@mui/material/AppBar";
 import Container from "@mui/material/Container";
-import Stack from "@mui/material/Stack";
-import Toolbar from "@mui/material/Toolbar";
-import Typography from "@mui/material/Typography";
 import type { Metadata } from "next";
-import { SignOutButton } from "@/components/SignOutButton";
-import { ThemeToggle } from "@/components/ThemeToggle";
+import { AppHeader } from "@/components/AppHeader";
 import { UsersTable } from "@/components/UsersTable";
 import { requireUser } from "@/server/auth/dal";
 import { getServices } from "@/server/services/container";
@@ -28,17 +23,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
 
   return (
     <>
-      <AppBar position="static" color="default" elevation={0}>
-        <Toolbar sx={{ gap: 2 }}>
-          <Typography variant="h6" component="h1" sx={{ flexGrow: 1 }}>
-            Hello, {user.firstName}
-          </Typography>
-          <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-            <ThemeToggle />
-            <SignOutButton />
-          </Stack>
-        </Toolbar>
-      </AppBar>
+      <AppHeader firstName={user.firstName} />
       <Container sx={{ py: 4 }}>
         <UsersTable
           users={result.items}

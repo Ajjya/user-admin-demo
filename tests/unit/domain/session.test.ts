@@ -26,6 +26,24 @@ describe("createSession", () => {
   });
 });
 
+describe("createSession userAgent", () => {
+  it("is null when absent or blank", () => {
+    expect(newSession().userAgent).toBeNull();
+    const blank = createSession({ id: "s", userId: "u", userAgent: "   " }, CREATED_AT, HOUR_MS);
+    expect(blank.userAgent).toBeNull();
+  });
+
+  it("is trimmed and limited to 256 characters", () => {
+    const session = createSession(
+      { id: "s", userId: "u", userAgent: `  ${"x".repeat(300)}  ` },
+      CREATED_AT,
+      HOUR_MS,
+    );
+
+    expect(session.userAgent).toHaveLength(256);
+  });
+});
+
 describe("isSessionActive", () => {
   it("is active before expiry", () => {
     expect(isSessionActive(newSession(), at(24 * HOUR_MS - 1))).toBe(true);

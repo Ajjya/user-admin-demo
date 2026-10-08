@@ -8,8 +8,9 @@ function toDocument({ id, ...rest }: Session): SessionDocument {
   return { _id: id, ...rest };
 }
 
-function toSession({ _id, ...rest }: SessionDocument): Session {
-  return { id: _id, ...rest };
+function toSession({ _id, userAgent, ...rest }: SessionDocument): Session {
+  // Sessions created before userAgent existed have no such field.
+  return { id: _id, userAgent: userAgent ?? null, ...rest };
 }
 
 export class MongoSessionRepository implements SessionRepository {
@@ -33,6 +34,14 @@ export class MongoSessionRepository implements SessionRepository {
       { _id: session.id },
       { $set: { terminatedAt: session.terminatedAt } },
     );
+  }
+
+  async listActiveForUser(userId: string, now: Date): Promise<Session[]> {
+    const documents = await this.sessions
+      .find({ userId, terminatedAt: null, expiresAt: { $gt: now } })
+      .sort({ createdAt: -1 })
+      .toArray();
+    return documents.map(toSession);
   }
 
   async terminateAllForUser(userId: string, now: Date): Promise<number> {

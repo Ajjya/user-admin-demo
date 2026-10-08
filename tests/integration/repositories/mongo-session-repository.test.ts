@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createSession, terminateSession, type Session } from "@/domain/session";
+import { sessionsCollection } from "@/server/db/collections";
 import { MongoSessionRepository } from "@/server/repositories/mongo/mongo-session-repository";
 import { setupTestDb } from "../helpers/test-db";
 
@@ -36,6 +37,37 @@ describe("MongoSessionRepository", () => {
     expect((await repository().findById(session.id))?.terminatedAt).toEqual(
       terminated.terminatedAt,
     );
+  });
+
+  it("lists only the user's active sessions, newest first", async () => {
+    const later = new Date(NOW.getTime() + 1000);
+    const newer = createSession({ id: "newer", userId: "user-1", userAgent: "Chrome" }, later, DAY_MS);
+    const older = makeSession("user-1");
+    const terminated = terminateSession(makeSession("user-1"), NOW);
+    const twoDaysAgo = new Date(NOW.getTime() - 2 * DAY_MS);
+    const expired = createSession({ id: "expired", userId: "user-1" }, twoDaysAgo, DAY_MS);
+    for (const session of [older, newer, terminated, expired, makeSession("user-2")]) {
+      await repository().insert(session);
+    }
+
+    const active = await repository().listActiveForUser("user-1", NOW);
+
+    expect(active.map((s) => s.id)).toEqual(["newer", older.id]);
+    expect(active[0].userAgent).toBe("Chrome");
+  });
+
+  it("reads sessions stored before userAgent existed as userAgent null", async () => {
+    const legacy = makeSession("user-1");
+    // Written the old way: no userAgent field at all.
+    await sessionsCollection(getDb()).insertOne({
+      _id: legacy.id,
+      userId: legacy.userId,
+      createdAt: legacy.createdAt,
+      expiresAt: legacy.expiresAt,
+      terminatedAt: null,
+    } as never);
+
+    expect((await repository().findById(legacy.id))?.userAgent).toBeNull();
   });
 
   it("terminates only the user's active sessions", async () => {

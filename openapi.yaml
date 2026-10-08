@@ -76,6 +76,30 @@ paths:
           $ref: "#/components/responses/EmailTaken"
 
   /api/sessions:
+    get:
+      tags: [Auth]
+      operationId: listSessions
+      summary: List your own active sessions, newest first
+      description: |
+        Active means not terminated and not expired. `current` marks the session that made this
+        request. Use `DELETE /api/sessions/{id}` to revoke one.
+      responses:
+        "200":
+          description: The caller's active sessions.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SessionSummary"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/PasswordChangeRequired"
     post:
       tags: [Auth]
       operationId: signIn
@@ -374,6 +398,27 @@ components:
         totalPages:
           type: integer
           minimum: 1
+
+    SessionSummary:
+      type: object
+      required: [id, userAgent, createdAt, expiresAt, current]
+      properties:
+        id:
+          type: string
+          format: uuid
+        userAgent:
+          type: [string, "null"]
+          maxLength: 256
+          description: The `User-Agent` header at sign-in (trimmed); null for sessions created without one.
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        current:
+          type: boolean
+          description: True for the session that made this request.
 
     SessionCreated:
       type: object

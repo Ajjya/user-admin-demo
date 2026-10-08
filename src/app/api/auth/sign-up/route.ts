@@ -6,5 +6,6 @@ import { signUpSchema } from "@/shared/schemas";
 
 export const POST = withApi(async (request) => {
   const input = await parseJsonBody(request, signUpSchema);
-  return sessionCreatedResponse(await getServices().authService.signUp(input));
+  const userAgent = request.headers.get("user-agent");
+  return sessionCreatedResponse(await getServices().authService.signUp(input, { userAgent }));
 });

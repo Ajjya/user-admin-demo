@@ -9,6 +9,7 @@ export interface RequestOptions {
   rawBody?: string;
   token?: string;
   cookie?: string;
+  userAgent?: string;
 }
 
 /** Builds the NextRequest that Next.js would pass to a Route Handler. */
@@ -22,6 +23,9 @@ export function apiRequest(method: string, path: string, options: RequestOptions
   }
   if (options.cookie) {
     headers.set("cookie", `sid=${options.cookie}`);
+  }
+  if (options.userAgent) {
+    headers.set("user-agent", options.userAgent);
   }
   return new NextRequest(new URL(path, BASE_URL), {
     method,

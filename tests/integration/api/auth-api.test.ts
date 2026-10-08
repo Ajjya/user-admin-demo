@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { POST as changePassword } from "@/app/api/auth/change-password/route";
 import { POST as signUp } from "@/app/api/auth/sign-up/route";
 import { DELETE as terminateSession } from "@/app/api/sessions/[id]/route";
-import { POST as signIn } from "@/app/api/sessions/route";
+import { GET as listSessions, POST as signIn } from "@/app/api/sessions/route";
 import { GET as listUsers, POST as createUser } from "@/app/api/users/route";
 import { PATCH as updateUser } from "@/app/api/users/[id]/route";
 import {
@@ -300,5 +300,56 @@ describe("temporary password flow", () => {
       undefined,
     );
     expect((await response.json()).user.mustChangePassword).toBe(true);
+  });
+});
+
+describe("GET /api/sessions", () => {
+  it("lists the caller's active sessions with their user agent and marks the current one", async () => {
+    const account = await signUpViaApi("correct-horse");
+    const other = await signIn(
+      apiRequest("POST", "/api/sessions", {
+        body: { email: account.email, password: "correct-horse" },
+        userAgent: "Mozilla/5.0 (iPhone) Safari/604.1",
+      }),
+      undefined,
+    );
+    const otherId = ((await other.json()) as { sessionId: string }).sessionId;
+    await signUpViaApi(); // someone else's session must not appear
+
+    const response = await listSessions(
+      apiRequest("GET", "/api/sessions", { token: account.sessionId }),
+      undefined,
+    );
+
+    expect(response.status).toBe(200);
+    const { items } = await response.json();
+    expect(items).toEqual([
+      expect.objectContaining({ id: otherId, userAgent: "Mozilla/5.0 (iPhone) Safari/604.1", current: false }),
+      expect.objectContaining({ id: account.sessionId, userAgent: null, current: true }),
+    ]);
+  });
+
+  it("no longer lists a revoked session", async () => {
+    const account = await signUpViaApi("correct-horse");
+    const second = await (
+      await signIn(
+        apiRequest("POST", "/api/sessions", { body: { email: account.email, password: "correct-horse" } }),
+        undefined,
+      )
+    ).json();
+
+    await terminateSession(
+      apiRequest("DELETE", `/api/sessions/${second.sessionId}`, { token: account.sessionId }),
+      routeParams(second.sessionId),
+    );
+
+    const { items } = await (
+      await listSessions(apiRequest("GET", "/api/sessions", { token: account.sessionId }), undefined)
+    ).json();
+    expect(items.map((s: { id: string }) => s.id)).toEqual([account.sessionId]);
+  });
+
+  it("returns 401 without a session", async () => {
+    await expectError(await listSessions(apiRequest("GET", "/api/sessions"), undefined), 401, "UNAUTHENTICATED");
   });
 });

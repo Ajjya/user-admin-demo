@@ -223,6 +223,9 @@ cached between runs. A newer push to the same branch cancels the run still in pr
   URL), create / edit / delete in dialogs.
 - **Temporary passwords.** A user created by an admin (or whose password an admin resets) must
   choose their own password after signing in; until then every other page and API call is blocked.
+- **Your sessions.** The "Sessions" page lists the devices signed in to your account (browser and
+  system, sign-in and expiry time) and lets you revoke any other one; the revoked device is signed
+  out at its next request. Expired sessions are deleted automatically by a MongoDB TTL index.
 - **Theme.** Light, dark or system; the choice is stored in `localStorage` and applied before the
   first paint, so a reload never flashes the wrong theme.
 - **REST API** for every operation, usable by non-browser clients with a Bearer token.
@@ -311,6 +314,7 @@ src/
     (auth)/               sign-in, sign-up pages + their Server Actions (route group, no URL segment)
     change-password/      forced password change page + action
     dashboard/            users table page + create/update/delete actions
+    sessions/             "your sessions" page + revoke action
     api/                  REST Route Handlers
   components/             Client Components (forms, dialogs, table, theme toggle, providers)
   domain/                 pure business rules: user.ts, session.ts, errors.ts
@@ -354,6 +358,7 @@ JSON in and out. Authenticated endpoints accept the session id as `Authorization
 | `POST /api/sessions` (sign in) | – | `{email, password}` | `201 {sessionId, expiresAt, user}` + cookie | `400`, `401 INVALID_CREDENTIALS`, `403 USER_INACTIVE` |
 | `DELETE /api/sessions/:id` (log out) | yes¹ | – | `204` | `401`, `404 SESSION_NOT_FOUND` |
 | `POST /api/auth/change-password` | yes¹ | `{newPassword}` | `200 {user}` | `400`, `401`, `409 PASSWORD_CHANGE_NOT_REQUIRED`, `422 PASSWORD_UNCHANGED` |
+| `GET /api/sessions` | yes | – | `200 {items: [{id, userAgent, createdAt, expiresAt, current}]}` | `401`, `403 PASSWORD_CHANGE_REQUIRED` |
 | `GET /api/users?page=1&pageSize=6` | yes | `page ≥ 1`, `pageSize` ∈ 6, 12, 24 | `200 {items, page, pageSize, total, totalPages}` | `400`, `401`, `403 PASSWORD_CHANGE_REQUIRED` |
 | `POST /api/users` | yes | `{firstName, lastName, email, password, status?}` | `201 {user}` | `400`, `401`, `403`, `409 EMAIL_TAKEN` |
 | `PATCH /api/users/:id` | yes | any of `{firstName, lastName, status, password}` | `200 {user}` | `400`, `401`, `403`, `404 USER_NOT_FOUND`, `422 USER_INACTIVE_RENAME` / `CANNOT_MODIFY_SELF` |
@@ -409,8 +414,9 @@ curl -s -X DELETE $B/api/sessions/$SID -H "authorization: Bearer $SID" -o /dev/n
 |---|---|---|
 | `_id` | string | random UUID; the session identifier, cookie value and Bearer token |
 | `userId` | string | |
+| `userAgent` | string \| null | `User-Agent` at sign-in (trimmed, at most 256 characters), shown on the Sessions page; absent on sessions created before the field existed |
 | `createdAt` | Date | |
-| `expiresAt` | Date | `createdAt` + `SESSION_TTL_HOURS` (absolute) |
+| `expiresAt` | Date | `createdAt` + `SESSION_TTL_HOURS` (absolute); a TTL index deletes the document once it has passed |
 | `terminatedAt` | Date \| null | set by log out, deactivation, deletion or a password reset |
 
 A session is active while `terminatedAt` is null, `expiresAt` is in the future, and its user is
@@ -423,6 +429,7 @@ active and not deleted.
 | users | `{email: 1}` unique | race-safe email uniqueness |
 | users | `{deletedAt: 1, createdAt: -1, _id: -1}` | paginated list of non-deleted users; `_id` keeps pages stable when timestamps are equal |
 | sessions | `{userId: 1, terminatedAt: 1}` | terminate all active sessions of a user |
+| sessions | `{expiresAt: 1}`, `expireAfterSeconds: 0` | TTL: MongoDB deletes a session once `expiresAt` has passed (the cleanup runs about once a minute; the app already treats the session as expired at `expiresAt`) |
 
 ## Decisions and trade-offs
 
@@ -512,7 +519,6 @@ docker push registry.example.com/user-admin-mongo:1.0.0
 - Roles and permissions instead of "every user is an admin".
 - Self-service password change, password reset by email, email verification and email change.
 - Optimistic concurrency for user updates (`updatedAt` in the update filter → `409`).
-- A TTL index to purge old sessions; a screen to list and revoke your own sessions.
 - Restoring soft-deleted users.
 - Search and filters in the users table.
 - Security headers (Content-Security-Policy etc.).
@@ -526,7 +532,9 @@ docker push registry.example.com/user-admin-mongo:1.0.0
   streams are not available; a production deployment would use a replica set or a managed cluster.
 - The MongoDB init scripts run only when the data volume is empty; changing credentials later needs
   a reset or a manual password change (see [MongoDB credentials](#mongodb-credentials)).
-- Expired and terminated sessions are kept forever.
+- A terminated session stays in the database until its original `expiresAt` (at most 24 hours),
+  when the TTL index deletes it; MongoDB runs the cleanup about once a minute, so deletion is not
+  instant. The Sessions page shows only active sessions.
 - E2E tests do not exercise the Docker images; they run the same standalone server against an
   in-memory MongoDB.
 - The UI is English only and dates are shown in UTC.

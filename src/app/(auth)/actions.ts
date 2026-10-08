@@ -1,5 +1,6 @@
 "use server";
 
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { clearSessionCookieInAction, setSessionCookieInAction } from "@/server/auth/cookies";
 import { getSession } from "@/server/auth/dal";
@@ -23,12 +24,10 @@ export async function signUpAction(_previous: FormState, formData: FormData): Pr
 
   try {
     const { firstName, lastName, email, password } = signUpFormSchema.parse(fields);
-    const { session } = await getServices().authService.signUp({
-      firstName,
-      lastName,
-      email,
-      password,
-    });
+    const { session } = await getServices().authService.signUp(
+      { firstName, lastName, email, password },
+      { userAgent: (await headers()).get("user-agent") },
+    );
     await setSessionCookieInAction(session);
   } catch (error) {
     return toFormState(error, values);
@@ -43,7 +42,9 @@ export async function signInAction(_previous: FormState, formData: FormData): Pr
 
   let mustChangePassword: boolean;
   try {
-    const { session, user } = await getServices().authService.signIn(signInSchema.parse(fields));
+    const { session, user } = await getServices().authService.signIn(signInSchema.parse(fields), {
+      userAgent: (await headers()).get("user-agent"),
+    });
     await setSessionCookieInAction(session);
     mustChangePassword = user.mustChangePassword;
   } catch (error) {

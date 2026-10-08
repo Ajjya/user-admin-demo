@@ -27,13 +27,13 @@ export class SessionService {
    * operation, so a user deactivated concurrently cannot slip through. If the insert fails after
    * the increment, the counter is one too high: harmless and avoids a transaction.
    */
-  async startSession(userId: string): Promise<AuthenticatedSession> {
+  async startSession(userId: string, userAgent?: string | null): Promise<AuthenticatedSession> {
     const user = await this.deps.users.incrementLoginsIfActive(userId);
     if (!user) {
       throw new DomainError("USER_INACTIVE", "Your account is inactive");
     }
     const session = createSession(
-      { id: this.deps.generateId(), userId },
+      { id: this.deps.generateId(), userId, userAgent },
       this.deps.clock(),
       this.deps.ttlMs,
     );
@@ -53,6 +53,11 @@ export class SessionService {
       return null;
     }
     return { session, user };
+  }
+
+  /** The user's own active sessions, newest first. */
+  listActive(userId: string): Promise<Session[]> {
+    return this.deps.sessions.listActiveForUser(userId, this.deps.clock());
   }
 
   /** Users may only terminate their own sessions; anything else looks like "not found". */

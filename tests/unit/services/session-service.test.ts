@@ -153,3 +153,34 @@ describe("SessionService.terminateAllForUser", () => {
     expect(await ctx.sessionService.getActiveSession(other.session.id)).not.toBeNull();
   });
 });
+
+describe("SessionService.listActive", () => {
+  it("lists the user's own active sessions, newest first, with their user agent", async () => {
+    const ctx = buildServices();
+    await seedUser(ctx, "u1");
+    await seedUser(ctx, "u2");
+    const older = await ctx.sessionService.startSession("u1", "Firefox");
+    ctx.clock.advance(1000);
+    const newer = await ctx.sessionService.startSession("u1", "Chrome");
+    const ended = await ctx.sessionService.startSession("u1");
+    await ctx.sessionService.terminate(ended.session.id, "u1");
+    await ctx.sessionService.startSession("u2");
+
+    const sessions = await ctx.sessionService.listActive("u1");
+
+    expect(sessions.map((s) => [s.id, s.userAgent])).toEqual([
+      [newer.session.id, "Chrome"],
+      [older.session.id, "Firefox"],
+    ]);
+  });
+
+  it("leaves out expired sessions", async () => {
+    const ctx = buildServices();
+    await seedUser(ctx, "u1");
+    await ctx.sessionService.startSession("u1");
+
+    ctx.clock.advance(TTL_MS);
+
+    expect(await ctx.sessionService.listActive("u1")).toEqual([]);
+  });
+});

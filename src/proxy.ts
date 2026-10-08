@@ -5,7 +5,7 @@ import { SESSION_COOKIE } from "@/server/auth/cookies";
 // Proxy runs on every matched request (prefetches included), so it must not hit the database.
 // The real check is the DAL (server/auth/dal.ts) in every page and Server Action.
 
-const PROTECTED_PAGES = ["/dashboard", "/change-password"];
+const PROTECTED_PAGES = ["/dashboard", "/sessions", "/change-password"];
 const SIGNED_OUT_PAGES = ["/sign-in", "/sign-up"];
 
 export function proxy(request: NextRequest): NextResponse {
@@ -27,5 +27,5 @@ export function proxy(request: NextRequest): NextResponse {
 }
 
 export const config = {
-  matcher: ["/dashboard", "/change-password", "/sign-in", "/sign-up"],
+  matcher: ["/dashboard", "/sessions", "/change-password", "/sign-in", "/sign-up"],
 };
