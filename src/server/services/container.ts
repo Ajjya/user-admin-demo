@@ -7,10 +7,12 @@ import { MongoUserRepository } from "@/server/repositories/mongo/mongo-user-repo
 import { Argon2PasswordHasher } from "@/server/security/password";
 import { AuthService } from "@/server/services/auth-service";
 import { SessionService } from "@/server/services/session-service";
+import { UserService } from "@/server/services/user-service";
 
 export interface Services {
   authService: AuthService;
   sessionService: SessionService;
+  userService: UserService;
 }
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -36,14 +38,22 @@ export function getServices(): Services {
       generateId: randomUUID,
       ttlMs: getConfig().SESSION_TTL_HOURS * HOUR_MS,
     });
+    const hasher = new Argon2PasswordHasher();
     const authService = new AuthService({
       users,
       sessionService,
-      hasher: new Argon2PasswordHasher(),
+      hasher,
       clock,
       generateId: randomUUID,
     });
-    services = { authService, sessionService };
+    const userService = new UserService({
+      users,
+      sessionService,
+      hasher,
+      clock,
+      generateId: randomUUID,
+    });
+    services = { authService, sessionService, userService };
   }
   return services;
 }

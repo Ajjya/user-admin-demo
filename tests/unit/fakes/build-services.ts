@@ -1,5 +1,6 @@
 import { AuthService } from "@/server/services/auth-service";
 import { SessionService } from "@/server/services/session-service";
+import { UserService } from "@/server/services/user-service";
 import { FakeClock, FakePasswordHasher, sequentialIds } from "./fakes";
 import { InMemorySessionRepository } from "./in-memory-session-repository";
 import { InMemoryUserRepository } from "./in-memory-user-repository";
@@ -14,6 +15,7 @@ export function buildServices(): {
   clock: FakeClock;
   sessionService: SessionService;
   authService: AuthService;
+  userService: UserService;
 } {
   const users = new InMemoryUserRepository();
   const sessions = new InMemorySessionRepository();
@@ -35,5 +37,12 @@ export function buildServices(): {
     clock: clock.now,
     generateId,
   });
-  return { users, sessions, hasher, clock, sessionService, authService };
+  const userService = new UserService({
+    users,
+    sessionService,
+    hasher,
+    clock: clock.now,
+    generateId,
+  });
+  return { users, sessions, hasher, clock, sessionService, authService, userService };
 }

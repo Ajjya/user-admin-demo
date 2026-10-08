@@ -34,6 +34,8 @@ export default defineConfig({
       include: ["src/domain/**", "src/server/services/**"],
       // Pure wiring of real implementations; exercised by the API and e2e tests instead.
       exclude: ["src/server/services/container.ts"],
+      // `yarn test:coverage` fails below this; business rules must stay tested.
+      thresholds: { lines: 80, statements: 80, functions: 80, branches: 80 },
     },
   },
 });
