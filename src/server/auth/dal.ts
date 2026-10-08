@@ -36,3 +36,15 @@ export async function requireNoSession(): Promise<void> {
     redirect("/dashboard");
   }
 }
+
+/**
+ * For every page except /change-password: a user holding an admin-set temporary password must
+ * replace it before doing anything else.
+ */
+export async function requireUser(): Promise<AuthenticatedSession> {
+  const auth = await requireSession();
+  if (auth.user.mustChangePassword) {
+    redirect("/change-password");
+  }
+  return auth;
+}

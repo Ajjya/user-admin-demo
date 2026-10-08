@@ -6,13 +6,13 @@ import Typography from "@mui/material/Typography";
 import type { Metadata } from "next";
 import { SignOutButton } from "@/components/SignOutButton";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { requireSession } from "@/server/auth/dal";
+import { requireUser } from "@/server/auth/dal";
 
 export const metadata: Metadata = { title: "Dashboard · User Admin" };
 
 // Server Component: the session check and (from task 12) the user query run on the server.
 export default async function DashboardPage() {
-  const { user } = await requireSession();
+  const { user } = await requireUser();
 
   return (
     <>
