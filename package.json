@@ -20,7 +20,8 @@
   "dependencies": {
     "next": "16.4.0",
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-dom": "19.3.0",
+    "zod": "^4"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.0",

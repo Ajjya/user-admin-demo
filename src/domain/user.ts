@@ -1,6 +1,7 @@
 import { DomainError } from "./errors";
 
-export type UserStatus = "active" | "inactive";
+export const USER_STATUSES = ["active", "inactive"] as const;
+export type UserStatus = (typeof USER_STATUSES)[number];
 
 export interface User {
   readonly id: string;
