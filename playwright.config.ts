@@ -14,7 +14,22 @@ export default defineConfig({
     baseURL,
     trace: "retain-on-failure",
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    {
+      name: "chromium",
+      use: { ...devices["Desktop Chrome"] },
+      testIgnore: /dashboard-pagination\.spec\.ts/,
+    },
+    {
+      // Pagination asserts the global newest-first order, so it must not run while other tests
+      // create users: it starts after the main project and runs its tests one by one.
+      name: "chromium-pagination",
+      use: { ...devices["Desktop Chrome"] },
+      testMatch: /dashboard-pagination\.spec\.ts/,
+      dependencies: ["chromium"],
+      fullyParallel: false,
+    },
+  ],
   webServer: {
     // Serves the standalone production build (`yarn test:e2e` builds first) against an in-memory MongoDB.
     command: "node e2e/server.mts",
