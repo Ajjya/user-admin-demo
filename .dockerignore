@@ -1,0 +1,21 @@
+# Keep the build context small and free of secrets and local state.
+.git
+.github
+.claude
+CLAUDE.md
+node_modules
+.next
+coverage
+test-results
+playwright-report
+blob-report
+tests
+e2e
+docker
+.env*
+!.env.example
+*.log
+Dockerfile
+.dockerignore
+docker-compose.yml
+README.md

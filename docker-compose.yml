@@ -1,0 +1,37 @@
+# Usage: cp .env.example .env && docker compose up --build
+# Reset the database (init scripts run again): docker compose down -v
+
+services:
+  mongo:
+    build: ./docker/mongo
+    image: user-admin-mongo:local
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME:?set MONGO_ROOT_USERNAME in .env}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:?set MONGO_ROOT_PASSWORD in .env}
+      MONGO_APP_DB: ${MONGO_APP_DB:-user_admin}
+      MONGO_APP_USERNAME: ${MONGO_APP_USERNAME:?set MONGO_APP_USERNAME in .env}
+      MONGO_APP_PASSWORD: ${MONGO_APP_PASSWORD:?set MONGO_APP_PASSWORD in .env}
+    volumes:
+      - mongo-data:/data/db
+    # Not published to the host by default; uncomment to connect from local tools or `yarn dev`.
+    # ports:
+    #   - "27017:27017"
+
+  app:
+    build: .
+    image: user-admin-app:local
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+    environment:
+      MONGODB_URI: mongodb://${MONGO_APP_USERNAME}:${MONGO_APP_PASSWORD}@mongo:27017/${MONGO_APP_DB:-user_admin}?authSource=${MONGO_APP_DB:-user_admin}
+      MONGODB_DB: ${MONGO_APP_DB:-user_admin}
+      SESSION_TTL_HOURS: ${SESSION_TTL_HOURS:-24}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    ports:
+      - "${APP_PORT:-3000}:3000"
+
+volumes:
+  mongo-data:
