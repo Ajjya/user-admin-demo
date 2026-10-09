@@ -47,6 +47,9 @@ describe("POST /api/auth/sign-up", () => {
     expect(cookie).toMatch(/HttpOnly/i);
     expect(cookie).toMatch(/SameSite=lax/i);
     expect(cookie).toMatch(/Path=\//);
+    // The browser drops the cookie exactly when the session expires (R5.5).
+    const expires = /Expires=([^;]+)/i.exec(cookie)?.[1];
+    expect(new Date(expires ?? "").getTime()).toBe(Math.floor(new Date(body.expiresAt).getTime() / 1000) * 1000);
     expect(response.headers.get("x-request-id")).toBeTruthy();
   });
 

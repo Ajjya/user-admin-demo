@@ -1,8 +1,8 @@
 import "server-only";
-import pino from "pino";
+import pino, { type LoggerOptions } from "pino";
 
-/** Structured JSON logs. Credentials and session ids are redacted wherever they appear. */
-export const logger = pino({
+/** Exported so the redaction can be tested against a captured stream. */
+export const loggerOptions: LoggerOptions = {
   // Read directly (not via getConfig) so logging works even when the rest of the config is invalid;
   // pino throws on an unknown level, which fails fast at startup.
   level: process.env.LOG_LEVEL ?? "info",
@@ -21,4 +21,7 @@ export const logger = pino({
     ],
     censor: "[REDACTED]",
   },
-});
+};
+
+/** Structured JSON logs. Credentials and session ids are redacted wherever they appear. */
+export const logger = pino(loggerOptions);
